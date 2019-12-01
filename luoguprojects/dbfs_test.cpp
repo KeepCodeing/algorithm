@@ -88,12 +88,12 @@ int MaxSizeBFS(int x, int y) {
 /*--------求图中独立子图（种子填充法或漫水填充法）---------*/
 // 这个算法基于DFS或BFS实现，想法就是对每个满足要求的点就行遍历，并进行染色（一般就是改变值）
 // 注意点：虽然说是对每个点进行遍历，但实际上从子图的某个起始点开始，遍历完一个独立子图后这个
-// 子图的点就被标记为被访问了，所以实际上它做的是找到一个子图中的任意一点，然后从这点开始扩散
-// 直到这个子图被染色完毕，在尝试找到一个没有被遍历的点，并染色其所属子图
+// 子图的点就被标记为被访问了，所以它做的其实是找到一个子图中的任意一点，然后从这点开始扩散
+// 直到这个子图被染色完毕，再尝试找到一个没有被遍历的点，并染色其所属子图
 // 对求最大面积的DFS算法进行了重载，加了一个color参数方便染色
 void MaxSizeDFS(int x, int y, int color) {
     // 出界，走过，为0（海洋），返回
-    if ((x < 0 || x >= line || y < 0 || y >= column) || (vistaed[x][y]) || map[x][y] == 0) return;
+    if ((x < 0 || x > line || y < 0 || y > column) || (vistaed[x][y]) || map[x][y] == 0) return;
     // 将走过的点标记
     vistaed[x][y] = 1;
     // 进行染色
@@ -132,15 +132,128 @@ void seed_fill() {
     }
     print_map();
 }
+/*--------图的最短路径--------*/
+// 思路是利用DFS先将图遍历一遍，然后把每种可能的路径的长度相加，再进行比较，最
+// 后得到的就是最短的路径
+// 利用一个二维数组存放图，行号是当前节点，列号表示当前节点到相邻节点的距离，
+// 规定99999表示无法走通（不相邻），节点自己到自己距离为0
+/*
+5 8
+1 2 2
+1 5 10
+2 3 3
+2 5 7
+3 1 4
+3 4 4
+4 5 5
+5 3 3*/
+
+int infinite = 99999, goal_city = 5;
+int min_num = infinite;
+int vistaed_city[10001];
+// 图的初始化函数
+void fill_graph() {
+    int a, b, c;
+    for (int i = 1; i <= line; ++i) {
+        for (int j = 1; j <= line; ++j) {
+            // 自己到自己距离为0
+            if (i == j) {map[i][j] = 0; continue;}
+            map[i][j] = infinite;
+        }
+    }
+    // 读入点到点的距离
+    for (int k = 1; k <= column; ++k) {
+        cin >> a >> b >> c;
+        map[a][b] = c;
+    }
+}
+// cur:当前城市编号，dis:已走路程
+void CloseRoadDFS(int cur, int dis) {
+    // 如果已走路程已经超过了最短路程，则没必要继续遍历了
+    if (dis >= min_num) return;
+    // 如果有一条路到达了目的城市，则尝试更新最短距离
+    if (cur == goal_city) {
+        if (dis < min_num) min_num = dis;
+        return;
+    }
+    // 从一号城市开始尝试到goal_city的所有可能的路径
+    for (int i = 1; i <= goal_city; i++) {
+        // 节点不相邻或者已经走过，跳过这种情况
+        if (map[cur][i] == infinite || vistaed_city[i]) continue;
+        vistaed_city[i] = 1;
+        // 从i号城市出发，继续遍历
+        CloseRoadDFS(i, dis + map[cur][i]);
+        vistaed_city[i] = 0;
+    }
+}
+void CloseRoadBFS(int cur_city) {
+    queue<int> city_queue;
+    vistaed_city[cur_city] = 1;
+    city_queue.push(cur_city);
+    while (!city_queue.empty()) {
+        cur_city = city_queue.front();
+        for (int i = 1; i <= goal_city; i++) {
+            if (map[cur_city][i] == infinite || vistaed_city[cur_city]) continue;
+            vistaed_city[i] = i;
+            city_queue.push(i);
+        }
+        city_queue.pop();
+    }
+}
+/*--------迷宫最短路径--------*/
+/*
+5 4
+0 0 1 0
+0 0 0 0
+0 0 1 0
+0 1 0 0
+0 0 0 1
+1 1 4 3*/
+int goal_x, goal_y;
+// 进入坐标（下一步的坐标）， 已走路程
+void MGDFS(int enter_x, int enter_y, int walked) {
+    // 当已走路程大于最小路程时，返回
+    if (walked >= min_num) return;
+    // 到达目的地
+    if (enter_x == goal_x && enter_y == goal_y) {
+        // 更新最短路径
+        if (walked < min_num) min_num = walked;
+        return;
+    }
+    // 如果出界或者被走过了或者为障碍物，跳过
+    if (enter_x < 0 || enter_x > line || enter_y < 0 || enter_y > column
+    || vistaed[enter_x][enter_y] || map[enter_x][enter_y]) return;
+    // 一开始忘了标记走过的点，或许导致数组越界而无法执行程序
+    vistaed[enter_x][enter_y] = 1;
+    // 开始上下左右遍历
+    MGDFS(enter_x-1, enter_y, walked + 1);
+    MGDFS(enter_x+1, enter_y, walked + 1);
+    MGDFS(enter_x, enter_y-1, walked + 1);
+    MGDFS(enter_x, enter_y+1, walked + 1);
+    // 取消标记的点，注意和最大面积的区别，迷宫需要多次尝试
+    vistaed[enter_x][enter_y] = 0;
+}
 int main() {
     // 这里粗心大意，把fill_map()函数写在参数输入前了...
     int x = 0, y = 0;
     cin >> line >> column;
-    cin >> x >> y;
-    fill_map();
+    // 图的最短路径
+    // fill_graph();
+    // 从一号城市出发
+    /*vistaed_city[1] = 1;
+    CloseRoadDFS(1, 0);
+    cout << min_num;*/
+    // 求最大面积
+    // cin >> x >> y;
+    // fill_map();
     // seed_fill();
     // cout << MaxSizeDFS(x, y);
     // cout << MaxSizeBFS(x, y);
+    // 迷宫
+    fill_map();
+    cin >> x >> y >> goal_x >> goal_y;
+    MGDFS(x, y, 0);
+    cout << min_num;
     return 0;
 }
 /*
