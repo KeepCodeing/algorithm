@@ -29,13 +29,16 @@ void dfs(int x, int y) {
 void dfs2(int x, int y) {
     if (graph[x][y] == 'D')
         return;
-    if (graph[x][y] == 'F') {
-        counter++;
-        graph[x][y] = 'W';
-    }
     // 未出界且未被访问
     if (!(x < 0 || x >= line || y < 0 || y >= column) &&
         vistaed[x][y] == 0) {
+        if (graph[x][y] == 'F') {
+            counter++;
+            // 按照之前的写法，将判断是否是青蛙写在了合法访问外，这样导致会有重复
+            // 点被访问，从而导致counter的值错误，解决方法是把是青蛙那点改成水，但
+            // 是直接只统计合法点才是正确且优雅的写法
+            // graph[x][y] = 'W';
+        }
         vistaed[x][y] = 1;
         dfs2(x-1, y);
         dfs2(x+1, y);
