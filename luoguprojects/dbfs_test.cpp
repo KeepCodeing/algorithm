@@ -233,10 +233,175 @@ void MGDFS(int enter_x, int enter_y, int walked) {
     // 取消标记的点，注意和最大面积的区别，迷宫需要多次尝试
     vistaed[enter_x][enter_y] = 0;
 }
+/*--------BFS求最少转机次数--------*/
+// 因为用BFS求最少转机次数需要自定义一个结构体充当队列，所以
+// 下面用DFS写一遍，就当是复习DFS（BFS效率高于DFS）
+void fill_plan_map() {
+    int temp_a, temp_b;
+    for (int i = 1; i <= line; i++) {
+        for (int j = 1; j <= line; j++) {
+            // 初始化图
+            if (i == j) {map[i][j] = 0; continue;}
+            map[i][j] = infinite;
+        }
+    }
+    for (int i = 1; i <= column; i++) {
+        cin >> temp_a >> temp_b;
+        map[temp_a][temp_b] = 1;
+        // 无向图
+        map[temp_b][temp_a] = 1;
+    }
+
+}
+/*
+5 7 1 5
+1 2
+1 3
+2 3
+2 4
+3 4
+3 5
+4 5*/
+void DFSTurnPlan(int start, int end, int walked) {
+    // 这里差点忘了
+    if (min_num <= walked) return;
+    // 差点忘了写达到终点
+    if (end == start) {
+        if (walked < min_num) {
+            // 这里犯了点错误，函数类型搞成int了，尝试返回walked变量，但实际最短距离就是min_num
+            // 这个全局变量
+            min_num = walked;
+            return;
+        }
+    }
+    for (int i = 1; i <= line; i++) {
+        // 如果某个城市没有被访问过并且当前城市可以通向第i个
+        // 城市，那么继续向下遍历。这里和求城市间最短距离几乎
+        // 没有什么区别，只是把每次增加的距离改为1了而已
+        if (!vistaed_city[i] && map[start][i] != infinite) {
+            vistaed_city[i] = 1;
+            DFSTurnPlan(i, end, walked + 1);
+            vistaed_city[i] = 0;
+        }
+    }
+}
+// 坠毁了，因为没有用自定义的结构体作为队列，所以只能起到一个遍历图的作用
+int LastestTurnPlan(int start, int end) {
+    int flag = 0, counter = 0;
+    queue<int> road_queue;
+    road_queue.push(start);
+    vistaed_city[start] = 1;
+    while (!road_queue.empty()) {
+        int cur_city = road_queue.front();
+        for (int i = 1; i <= line; i++) {
+            if (vistaed_city[i] != 1 && map[cur_city][i] != infinite) {
+                vistaed_city[i] = 1;
+                road_queue.push(i);
+                counter++;
+            }
+            if (cur_city == end) {
+                flag = 1;
+                break;
+            }
+        }
+        if (flag) break;
+        road_queue.pop();
+    }
+    return counter;
+}
+/*--------求图的某一点到其它点的最短路径--------*/
+/*
+4 8
+1 2 2
+1 3 6
+1 4 4
+2 3 3
+3 1 7
+3 4 1
+4 1 5
+4 3 12*/
+// Floyd算法
+// 我们知道在求两点之间的最短距离时，如不加入其它点那么它们间的最短距离就是它们到对方
+// 的距离。而Floyd算法就是借助中间点来对每条边求最短距离的，这里所用的是1~n之间的所有
+// 点作为中间点
+void ShortestWayFloyd() {
+    // 这个算法实现非常简单，但是效率过于低下（O(n^3)），适用于
+    // 数据量不大的时候
+    /* 这段代码的基本思想就是：最开始只允许经过1号顶点进行中转，接下来只允许经过1和2号顶点进行中转……允许
+     * 经过1~n号所有顶点进行中转，求任意两点之间的最短路程。用一句话概括就是：从i号顶点到j号顶点只经过前
+     * k号点的最短路程。*/
+    for (int k = 1; k <= line; ++k) {
+        for (int i = 1; i <= line; ++i) {
+            for (int j = 1; j <= line; ++j) {
+                // 如果i，j两点之间的距离大于了i点到k点（中间点）加上j点到k点的距离，
+                // 则说明存在更短的路径
+                if (map[i][j] > map[i][k] + map[k][j]) {
+                    // 更新最短路径
+                    map[i][j] = map[i][k] + map[k][j];
+                }
+            }
+        }
+    }
+    print_map();
+}
+// Dijkstra算法
+// 相对于上面的Floyd算法，这个算法提高了运行效率，同时，代码也更加复杂，但是它不能求存在负权边的图的
+// 最短路径，因为它“松弛”的过程中，就是根据两个点的距离来算的，如果存在负数，那么这个距离会不断缩小，
+// 也就永远无法达到目的。它可以用来求从任意一点开始，该点到其它点的最短距离。
+/*
+6 9
+1 2 1
+1 3 12
+2 3 9
+2 4 3
+3 5 5
+4 3 4
+4 5 13
+4 6 15
+5 6 4*/
+void ShortestWayDijkstra() {
+    // Dijkstra算法的主要思想就是通过不断“松弛”边，来更新最短路径
+    // 何为“松弛”：它的意思就是判断从起源点直接到另一个点的距离是否大于从起源点经过另外的点（如1->3和1->2->3），
+    // 如果直接距离大于间接距离，则更新最短距离，直到所有点都被更新完毕。需要注意的是，该算法需要通过存储起源点
+    // 到其它点的距离来判断是否可以进行“松弛”，所以需要多一个数组，来进行初始化。
+    int dis[1000];
+    int u = 0;
+    // 初始化存储距离的数组
+    for (int i = 1; i <= line; i++) {
+        // 这里规定起源点是1，这样就把1到其它点的距离存储起来了
+        dis[i] = map[1][i];
+        // 初始化标记数组，防止重复访问
+        vistaed_city[i] = 0;
+    }
+    vistaed_city[1] = 1;
+    // 核心代码
+    for (int i = 1; i <= line - 1; i++) {
+        min_num = infinite;
+        for (int j = 1; j <= line; j++) {
+            // 先找到离起始点最近的点，再通过这个点发散到其他的点进行“松弛”
+            if (!vistaed_city[j] && dis[j] < min_num) {
+                min_num = dis[j];
+                // 暂存离起始点最近的点的下标
+                u = j;
+            }
+        }
+        vistaed_city[u] = 1;
+        for (int n = 1; n <= line; n++) {
+            // 排除距离非法的点
+            if (map[u][n] > infinite) continue;
+            // 起源点到另一点的距离大于距离起源点最近的点到该点的距离，则进行“松弛”，将最短距离更新
+            if (dis[n] > dis[u] + map[u][n]) dis[n] = dis[u] + map[u][n];
+        }
+    }
+    for (int i = 1; i <= line; i++) {
+        cout << dis[i] << ' ';
+    }
+}
 int main() {
     // 这里粗心大意，把fill_map()函数写在参数输入前了...
     int x = 0, y = 0;
     cin >> line >> column;
+    // cin >> x >> y;
     // 图的最短路径
     // fill_graph();
     // 从一号城市出发
@@ -250,11 +415,22 @@ int main() {
     // cout << MaxSizeDFS(x, y);
     // cout << MaxSizeBFS(x, y);
     // 迷宫
-    fill_map();
+    /*fill_map();
     cin >> x >> y >> goal_x >> goal_y;
     MGDFS(x, y, 0);
     cout << min_num;
-    return 0;
+    return 0;*/
+    // DFS求最少转机次数
+    /*fill_plan_map();
+    DFSTurnPlan(x, y, 0);
+    cout << min_num;*/
+    // Floyd算法求任意两点间最短路径
+    // fill_graph();
+    // ShortestWayFloyd();
+    // Dijkstra算法求某点到其他点的最短距离
+    fill_graph();
+    ShortestWayDijkstra();
+
 }
 /*
 测试数据
